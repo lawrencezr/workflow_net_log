@@ -47,7 +47,7 @@ class Arc:
         self.target = target
 
 
-def xml_to_dic(path):
+def xml_to_list(path):
     tree = ET.parse(path)
     root = tree.getroot()
 
@@ -63,8 +63,30 @@ def xml_to_dic(path):
         p.set_type(0)
     for t in transitions:
         t.set_type(1)
-    arcs = [Place(arc[1][0].text, arc.attrib['id']) for arc in iter_arc]
+    places.extend(transitions)
+    arcs = [Arc(arc.attrib['source'], arc.attrib['target']) for arc in iter_arc]
+    return places, arcs
+
+def get_log_of_model(model_file, logfile):
+    places, arcs = xml_to_list(model_file)
+    num_places = len(places)
+    graph = [[0 for _ in range(num_places)] for _ in range(num_places)]
+    id_dic = {}
+    name_dic = {}
+    for i in range(num_places):
+        id_dic.update({places[i].get_id():i})
+        if places[i].get_type() == 1:
+            name_dic.update({i:places[i].get_name()})
+    print(id_dic)
+    print(name_dic)
+    for arc in arcs:
+        i = id_dic[arc.get_source()]
+        j = id_dic[arc.get_target()]
+        graph[i][j] = 1
+    print(graph)
+
+
 
 
 if __name__ == '__main__':
-    xml_to_dic("test_cases/Model1.pnml")
+    get_log_of_model("test_cases/Model1.pnml","log.txt")
