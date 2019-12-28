@@ -1,13 +1,13 @@
 import xml.etree.ElementTree as ET
 import os
 import sys
+import copy
+sys.setrecursionlimit(1000000)
 
-res = []
-path = []
+RES = []
 
 
 class PlaceOrTrans:
-    # type = 0
 
     def __init__(self, name, id):
         self.name = name
@@ -26,12 +26,6 @@ class PlaceOrTrans:
 
     def set_id(self, id):
         self.id = id
-
-    def get_type(self):
-        return self.type
-
-    def set_type(self, type):
-        self.type = type
 
     def get_input(self):
         return self.input
@@ -63,38 +57,29 @@ class Arc:
         self.target = target
 
 
+# 解析pnml文件
 def xml_to_list(path):
     tree = ET.parse(path)
-    root = tree.getroot()
-
-    print(root.tag)
-    print(root.attrib)
-    iter_place = tree.iter(tag="place")
-    iter_trans = tree.iter(tag="transition")
-    iter_arc = tree.iter(tag="arc")
-    print(type(iter_place))
+    iter_place = tree.iter(tag="place")  # dom树中住所对象的列表
+    iter_trans = tree.iter(tag="transition")  # dom树中变迁对象的列表
+    iter_arc = tree.iter(tag="arc")  # dom树中弧对象的列表
+    # print(type(iter_place))
     places = [PlaceOrTrans(place[1][0].text, place.attrib['id']) for place in iter_place]
     transitions = [PlaceOrTrans(trans[1][0].text, trans.attrib['id']) for trans in iter_trans]
-    # for p in places:
-    #     p.set_type(0)
-    # for t in transitions:
-    #     t.set_type(1)
-    # places.extend(transitions)
     arcs = [Arc(arc.attrib['source'], arc.attrib['target']) for arc in iter_arc]
     return places, transitions, arcs
 
 
-def get_log_of_model(model_file, logfile):
+def get_log_of_model(model_file, log_file):
     places, transitions, arcs = xml_to_list(model_file)
-    # graph = [[0 for _ in range(num_places)] for _ in range(num_places)]
-    places_id_index = {}
-    transitions_id_index = {}
+    places_id_index = {}  # 住所的id和索引的字典映射
+    transitions_id_index = {}  # 变迁的id和索引的字典映射
     for i in range(len(places)):
         places_id_index.update({places[i].get_id():i})
     for i in range(len(transitions)):
         transitions_id_index.update({transitions[i].get_id():i})
-    print(places_id_index)
-    print(transitions_id_index)
+    # print(places_id_index)
+    # print(transitions_id_index)
     for arc in arcs:
         source = arc.get_source()  # 获取弧的源节点id
         target = arc.get_target()  # 获取弧的目标节点id
@@ -106,86 +91,72 @@ def get_log_of_model(model_file, logfile):
         elif source in transitions_id_index.keys() and target in places_id_index.keys():
             places[places_id_index[target]].set_input(source)
             transitions[transitions_id_index[source]].set_output(target)
-    for p in places:
-        print(p.get_name())
-        print(p.get_input())
-        print(p.get_output())
-    for t in transitions:
-        print(t.get_name())
-        print(t.get_input())
-        print(t.get_output())
+    # for p in places:
+    #     print(p.get_name())
+    #     print(p.get_input())
+    #     print(p.get_output())
+    # for t in transitions:
+    #     print(t.get_name())
+    #     print(t.get_input())
+    #     print(t.get_output())
     # 初始状态
     init_state = [1 if p.get_input() == [] else 0 for p in places]
     # 结束状态
     end_state = [1 if p.get_output() == [] else 0 for p in places]
-    print(init_state)
-    print(end_state)
-    get_path(init_state,[],[init_state],[])
-    # pathes = get_path(graph,num_places)
-    # print(pathes)
-    # res_string = []
-    # tuple_string = ""
-    # for i in pathes:
-    #     for j in i:
-    #         # print(j)
-    #         tuple_string += (name_dic[j]+" ")
-    #         # print(name_dic[j])
-    #     res_string.append(tuple_string)
-    #     tuple_string = ""
-    # for r in res_string:
-        # print(r)
+    # 执行过的状态与执行后达该状态的变迁的字典映射
+    state_trans = {i:[] for i in range(len(places))}
+    get_path(init_state,end_state, places, transitions,transitions_id_index, [],[init_state],state_trans)
+    count = 0
+    for p in RES:
+        print(p)
+        count += 1
+    print("总数：", count)
+    log(log_file,RES)
 
 
-
-def get_path(state, path, exe_state, output_state):
-    visited = [0 for _ in range(num_places)]
-    source = 0
-    target = 0
-    for i in range(num_places):
-        flag = True
-        for j in range(num_places):
-            if graph[j][i]:
-                flag = False
-                break
-        if flag:
-            source = i
-            break
-    for i in range(num_places):
-        flag = True
-        for j in range(num_places):
-            if graph[i][j]:
-                flag = False
-                break
-        if flag:
-            target = i
-            break
-    path.append(source)
-    visited[source] += 1
-    dfs(graph, visited, target)
-    return res
-
-def dfs(graph, visited, target):
-    cur = path[-1]
-    if cur == target:
-        res.append(path)
-        path.pop(-1)
-        visited[cur] -= 1
-        return
-    for i in range(len(graph)):
-        if graph[cur][i]:
-            if visited[i] < 2:
-                path.append(i)
-                visited[i] += 1
-                dfs(graph, visited, target)
-    path.pop(-1)
-    visited[cur] -= 1
-    return
+def log(file_name, res):
+    with open(file_name,'w',encoding='utf-8') as f:
+        f.write(str(len(res)))
+        f.write('\n')
+        for r in res:
+            f.write(" ".join(r))
+            f.write('\n')
 
 
-
-
-
+# 当前状态，结束状态，住所列表，变迁列表，变迁的id和索引的字典映射，某一次遍历的路径，已经执行过的状态，执行过的状态与执行后达该状态的变迁的字典映射
+def get_path(state, end_state, places,transitions,transitions_id_index, path, exe_state, state_trans):
+    if state == end_state:
+        RES.append(path)
+    else:
+        enable_trans = {}
+        for s in range(len(state)):
+            if state[s] >= 1:
+                for t_id in places[s].get_output():
+                    # 对于可达变迁的输入place的状态-1
+                    after_place = [state[i] - 1 if places[i].get_id() in transitions[transitions_id_index[t_id]].get_input() else state[i] for i in range(len(state))]
+                    # print(after_place)
+                    if -1 not in after_place:
+                        # 对于可达变迁的输出place状态+1，构建变迁id和状态的映射字典
+                        enable_trans[t_id] = [after_place[i] + 1 if places[i].get_id() in transitions[transitions_id_index[t_id]].get_output() else after_place[i] for i in range(len(state))]
+                # print(enable_trans)
+        for t_id, cur_state in enable_trans.items():
+            cur_index = exe_state.index(state)
+            if cur_state not in exe_state:
+                path_next = path+[transitions[transitions_id_index[t_id]].get_name()]
+                exe_state_next = exe_state+[cur_state]
+                # 记录当前状态已经执行了哪些变迁
+                state_trans_next = copy.deepcopy(state_trans)
+                state_trans_next[cur_index].append(t_id)
+                get_path(cur_state,end_state, places,transitions,transitions_id_index,path_next, exe_state_next, state_trans_next)
+            elif t_id not in state_trans[cur_index] or len(enable_trans) == 1:
+                path_next = path+[transitions[transitions_id_index[t_id]].get_name()]
+                exe_state_next = exe_state
+                # 记录当前状态已经执行了哪些变迁
+                state_trans_next = copy.deepcopy(state_trans)
+                state_trans_next[cur_index].append(t_id)
+                get_path(cur_state, end_state, places, transitions, transitions_id_index, path_next,
+                         exe_state_next, state_trans_next)
 
 
 if __name__ == '__main__':
-    get_log_of_model("test_cases/Model1.pnml","log.txt")
+    get_log_of_model("test_cases/Model1.xml","log_model1.txt")
